@@ -44,27 +44,27 @@ type Config struct {
 	// "{{TEMPLATE}}" is replaced with the path to a copy of workdir/template dir.
 	// "{{TCP_PORT}}" is replaced with a random free TCP port
 	// "{{FN%8}}" is replaced with PCI BDF (Function#%8) and PCI BDF Dev# += index/8
-	QemuArgs string `json:"qemu_args"`
+	QemuArgs string `json:"qemu_args,omitempty"`
 	// Location of the kernel for injected boot (e.g. arch/x86/boot/bzImage, optional).
 	// This is passed to QEMU as the -kernel option.
 	Kernel string `json:"kernel"`
 	// Additional command line options for the booting kernel, for example `root=/dev/sda1`.
 	// Can only be specified with kernel.
-	Cmdline string `json:"cmdline"`
+	Cmdline string `json:"cmdline,omitempty"`
 	// Initial ramdisk, passed via -initrd QEMU flag (optional).
 	Initrd string `json:"initrd"`
 	// QEMU image device.
 	// The default value "hda" is transformed to "-hda image" for QEMU.
 	// The modern way of describing QEMU hard disks is supported, so the value
 	// "drive index=0,media=disk,file=" is transformed to "-drive index=0,media=disk,file=image" for QEMU.
-	ImageDevice string `json:"image_device"`
+	ImageDevice string `json:"image_device,omitempty"`
 	// EFI images containing the EFI itself, as well as this VMs EFI variables.
-	EfiCodeDevice string `json:"efi_code_device"`
-	EfiVarsDevice string `json:"efi_vars_device"`
+	EfiCodeDevice string `json:"efi_code_device,omitempty"`
+	EfiVarsDevice string `json:"efi_vars_device,omitempty"`
 	// QEMU network device type to use.
 	// If not specified, some default per-arch value will be used.
 	// See the full list with qemu-system-x86_64 -device help.
-	NetDev string `json:"network_device"`
+	NetDev string `json:"network_device,omitempty"`
 	// Number of VM CPUs (1 by default).
 	CPU int `json:"cpu"`
 	// Amount of VM memory in MiB (1024 by default).
@@ -72,7 +72,7 @@ type Config struct {
 	// For building kernels without -snapshot for pkg/build (true by default).
 	Snapshot bool `json:"snapshot"`
 	// Magic key used to dongle macOS to the device.
-	AppleSmcOsk string `json:"apple_smc_osk"`
+	AppleSmcOsk string `json:"apple_smc_osk,omitempty"`
 }
 
 type Pool struct {
