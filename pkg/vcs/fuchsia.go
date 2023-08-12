@@ -28,7 +28,7 @@ func (ctx *fuchsia) Poll(repo, branch string) (*Commit, error) {
 		// Fuchsia ecosystem is hard-wired to the main repo.
 		return nil, fmt.Errorf("fuchsia: can only check out https://fuchsia.googlesource.com/master")
 	}
-	if _, err := runSandboxed(ctx.dir, "./.jiri_root/bin/jiri", "update"); err != nil {
+	if _, err := runSandboxed(ctx.dir, "./.jiri_root/bin/jiri", "update", "--rebase-submodules"); err != nil {
 		if err := ctx.initRepo(); err != nil {
 			return nil, err
 		}
