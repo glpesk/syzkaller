@@ -278,11 +278,18 @@ func (inst *instance) Copy(hostSrc string) (string, error) {
 	return vmDst, err
 }
 
+type TeeReadCloser struct{ io.Reader }
+
+func (tr TeeReadCloser) Close() error { return nil }
+
 func (inst *instance) Run(timeout time.Duration, stop <-chan bool, command string) (
 	<-chan []byte, <-chan error, error) {
 	rpipe, wpipe, err := osutil.LongPipe()
 	if err != nil {
 		return nil, nil, err
+	}
+	if inst.debug {
+		rpipe = TeeReadCloser{io.TeeReader(rpipe, os.Stdout)}
 	}
 	inst.merger.Add("adb", rpipe)
 
