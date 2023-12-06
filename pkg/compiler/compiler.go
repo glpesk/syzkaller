@@ -76,6 +76,7 @@ func Compile(desc *ast.Description, consts map[string]uint64, target *targets.Ta
 	comp := createCompiler(desc.Clone(), target, eh)
 	comp.filterArch()
 	comp.typecheck()
+	comp.flattenFlags()
 	// The subsequent, more complex, checks expect basic validity of the tree,
 	// in particular corrent number of type arguments. If there were errors,
 	// don't proceed to avoid out-of-bounds references to type arguments.
@@ -93,7 +94,7 @@ func Compile(desc *ast.Description, consts map[string]uint64, target *targets.Ta
 		comp.assignSyscallNumbers(consts)
 	}
 	comp.patchConsts(consts)
-	comp.check()
+	comp.check(consts)
 	if comp.errors != 0 {
 		return nil
 	}
@@ -356,4 +357,69 @@ func arrayContains(a []string, v string) bool {
 		}
 	}
 	return false
+}
+
+func (comp *compiler) flattenFlags() {
+	comp.flattenIntFlags()
+	comp.flattenStrFlags()
+
+	for _, n := range comp.desc.Nodes {
+		switch flags := n.(type) {
+		case *ast.IntFlags:
+			// It's possible that we don't find the flag in intFlags if it was
+			// skipped due to errors (or special name "_") when populating
+			// intFlags (see checkNames).
+			if f, ok := comp.intFlags[flags.Name.Name]; ok {
+				flags.Values = f.Values
+			}
+		case *ast.StrFlags:
+			// Same as for intFlags above.
+			if f, ok := comp.strFlags[flags.Name.Name]; ok {
+				flags.Values = f.Values
+			}
+		}
+	}
+}
+
+func (comp *compiler) flattenIntFlags() {
+	for name, flags := range comp.intFlags {
+		if err := recurFlattenFlags[*ast.IntFlags, *ast.Int](comp, name, flags, comp.intFlags,
+			map[string]bool{}); err != nil {
+			comp.error(flags.Pos, "%v", err)
+		}
+	}
+}
+
+func (comp *compiler) flattenStrFlags() {
+	for name, flags := range comp.strFlags {
+		if err := recurFlattenFlags[*ast.StrFlags, *ast.String](comp, name, flags, comp.strFlags,
+			map[string]bool{}); err != nil {
+			comp.error(flags.Pos, "%v", err)
+		}
+	}
+}
+
+func recurFlattenFlags[F ast.Flags[V], V ast.FlagValue](comp *compiler, name string, flags F,
+	allFlags map[string]F, visitedFlags map[string]bool) error {
+	if _, visited := visitedFlags[name]; visited {
+		return fmt.Errorf("flags %v used twice or circular dependency on %v", name, name)
+	}
+	visitedFlags[name] = true
+
+	var values []V
+	for _, flag := range flags.GetValues() {
+		if f, isFlags := allFlags[flag.GetName()]; isFlags {
+			if err := recurFlattenFlags[F, V](comp, flag.GetName(), f, allFlags, visitedFlags); err != nil {
+				return err
+			}
+			values = append(values, allFlags[flag.GetName()].GetValues()...)
+		} else {
+			values = append(values, flag)
+		}
+	}
+	if len(values) > 2000 {
+		return fmt.Errorf("%v has more than 2000 values", name)
+	}
+	flags.SetValues(values)
+	return nil
 }

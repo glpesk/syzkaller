@@ -5,10 +5,13 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"time"
 
+	"github.com/google/syzkaller/pkg/hash"
 	"github.com/google/syzkaller/pkg/image"
 	"golang.org/x/net/context"
 	"google.golang.org/appengine/v2"
@@ -205,4 +208,125 @@ func minuteCacheNsUpdate(c context.Context, ns string) error {
 		}
 	}
 	return nil
+}
+
+func CachedManagerList(c context.Context, ns string) ([]string, error) {
+	return cachedObjectList(c,
+		fmt.Sprintf("%s-managers-list", ns),
+		time.Minute,
+		func(c context.Context) ([]string, error) {
+			return managerList(c, ns)
+		},
+	)
+}
+
+func CachedUIManagers(c context.Context, accessLevel AccessLevel, ns string,
+	filter *userBugFilter) ([]*uiManager, error) {
+	return cachedObjectList(c,
+		fmt.Sprintf("%s-%v-%v-ui-managers", ns, accessLevel, filter.Hash()),
+		5*time.Minute,
+		func(c context.Context) ([]*uiManager, error) {
+			return loadManagers(c, accessLevel, ns, filter)
+		},
+	)
+}
+
+func cachedObjectList[T any](c context.Context, key string, period time.Duration,
+	load func(context.Context) ([]T, error)) ([]T, error) {
+	// Check if the object is in cache.
+	var obj []T
+	_, err := memcache.Gob.Get(c, key, &obj)
+	if err == nil {
+		return obj, nil
+	} else if err != memcache.ErrCacheMiss {
+		return nil, err
+	}
+
+	// Load the object.
+	obj, err = load(c)
+	if err != nil {
+		return nil, err
+	}
+	item := &memcache.Item{
+		Key:        key,
+		Object:     obj,
+		Expiration: period,
+	}
+	if err := memcache.Gob.Set(c, item); err != nil {
+		return nil, err
+	}
+	return obj, nil
+}
+
+type RequesterInfo struct {
+	Requests []time.Time
+}
+
+func (ri *RequesterInfo) Record(now time.Time, cfg ThrottleConfig) bool {
+	var newRequests []time.Time
+	for _, req := range ri.Requests {
+		if now.Sub(req) >= cfg.Window {
+			continue
+		}
+		newRequests = append(newRequests, req)
+	}
+	newRequests = append(newRequests, now)
+	sort.Slice(ri.Requests, func(i, j int) bool { return ri.Requests[i].Before(ri.Requests[j]) })
+	// Don't store more than needed.
+	if len(newRequests) > cfg.Limit+1 {
+		newRequests = newRequests[len(newRequests)-(cfg.Limit+1):]
+	}
+	ri.Requests = newRequests
+	// Check that we satisfy the conditions.
+	return len(newRequests) <= cfg.Limit
+}
+
+var ErrThrottleTooManyRetries = errors.New("all attempts to record request failed")
+
+func ThrottleRequest(c context.Context, requesterID string) (bool, error) {
+	cfg := getConfig(c).Throttle
+	if cfg.Empty() || requesterID == "" {
+		// No sense to query memcached.
+		return true, nil
+	}
+	key := fmt.Sprintf("requester-%s", hash.String([]byte(requesterID)))
+	const attempts = 5
+	for i := 0; i < attempts; i++ {
+		var obj RequesterInfo
+		item, err := memcache.Gob.Get(c, key, &obj)
+		if err == memcache.ErrCacheMiss {
+			ok := obj.Record(timeNow(c), cfg)
+			err = memcache.Gob.Add(c, &memcache.Item{
+				Key:        key,
+				Object:     obj,
+				Expiration: cfg.Window,
+			})
+			if err == memcache.ErrNotStored {
+				// Conflict with another instance. Retry.
+				continue
+			}
+			return ok, err
+		} else if err != nil {
+			return false, err
+		}
+		// Update the existing object.
+		ok := obj.Record(timeNow(c), cfg)
+		item.Expiration = cfg.Window
+		item.Object = obj
+		err = memcache.Gob.CompareAndSwap(c, item)
+		if err == memcache.ErrCASConflict {
+			if ok {
+				// Only retry if we approved the query.
+				// If we denied and there was a concurrent write
+				// to the same object, it could have only denied
+				// the query as well.
+				// Our save won't change anything.
+				continue
+			}
+		} else if err != nil {
+			return false, err
+		}
+		return ok, nil
+	}
+	return false, ErrThrottleTooManyRetries
 }
