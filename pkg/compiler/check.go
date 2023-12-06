@@ -20,12 +20,13 @@ func (comp *compiler) typecheck() {
 	comp.checkComments()
 	comp.checkDirectives()
 	comp.checkNames()
+	comp.checkFlags()
 	comp.checkFields()
 	comp.checkTypedefs()
 	comp.checkTypes()
 }
 
-func (comp *compiler) check() {
+func (comp *compiler) check(consts map[string]uint64) {
 	comp.checkTypeValues()
 	comp.checkAttributeValues()
 	comp.checkUnused()
@@ -34,6 +35,7 @@ func (comp *compiler) check() {
 	comp.checkConstructors()
 	comp.checkVarlens()
 	comp.checkDupConsts()
+	comp.checkConstsFlags(consts)
 }
 
 func (comp *compiler) checkComments() {
@@ -151,6 +153,27 @@ func (comp *compiler) checkNames() {
 					name, prev.Pos)
 			}
 			calls[name] = n
+		}
+	}
+}
+
+func (comp *compiler) checkFlags() {
+	checkFlagsGeneric[*ast.IntFlags, *ast.Int](comp, comp.intFlags)
+	checkFlagsGeneric[*ast.StrFlags, *ast.String](comp, comp.strFlags)
+}
+
+func checkFlagsGeneric[F ast.Flags[V], V ast.FlagValue](comp *compiler, allFlags map[string]F) {
+	for name, flags := range allFlags {
+		inConstIdent := true
+		for _, val := range flags.GetValues() {
+			if _, ok := allFlags[val.GetName()]; ok {
+				inConstIdent = false
+			} else {
+				if !inConstIdent {
+					comp.error(flags.GetPos(), "flags identifier not at the end in %v definition", name)
+					break
+				}
+			}
 		}
 	}
 }
@@ -325,10 +348,6 @@ func (comp *compiler) checkAttributeValues() {
 			for _, f := range st.Fields {
 				isOut := hasOutOverlay
 				for _, attr := range f.Attrs {
-					desc := structFieldAttrs[attr.Ident]
-					if desc.CheckConsts != nil {
-						desc.CheckConsts(comp, f, attr)
-					}
 					switch attr.Ident {
 					case attrOutOverlay.Name:
 						hasOutOverlay = true
@@ -634,7 +653,8 @@ func (comp *compiler) collectUsedType(structs, flags, strflags map[string]bool, 
 		}
 		return
 	}
-	if desc == typeFlags {
+	if desc == typeFlags ||
+		(desc == typeInt && len(t.Args) > 0 && t.Args[0].Ident != "") {
 		flags[t.Args[0].Ident] = true
 		return
 	}
@@ -656,6 +676,15 @@ func (comp *compiler) checkUnused() {
 	for _, n := range comp.collectUnused() {
 		pos, typ, name := n.Info()
 		comp.error(pos, fmt.Sprintf("unused %v %v", typ, name))
+	}
+}
+
+func (comp *compiler) checkConstsFlags(consts map[string]uint64) {
+	for name := range consts {
+		if flags, isFlag := comp.intFlags[name]; isFlag {
+			pos, _, _ := flags.Info()
+			comp.error(pos, "const %v is already a flag", name)
+		}
 	}
 }
 
@@ -1179,6 +1208,9 @@ func (comp *compiler) checkTypeArg(t, arg *ast.Type, argDesc namedArg) {
 			comp.error(col.Pos, "unexpected ':'")
 			return
 		}
+		// We only want to perform this check if kindIdent is the only kind of
+		// this type. Otherwise, the token after the colon could legitimately
+		// be an int for example.
 		if desc.Kind == kindIdent {
 			if unexpected, expect, ok := checkTypeKind(col, kindIdent); !ok {
 				comp.error(arg.Pos, "unexpected %v after colon, expect %v", unexpected, expect)
@@ -1233,30 +1265,33 @@ func checkTypeKind(t *ast.Type, kind int) (unexpected, expect string, ok bool) {
 	case kind == kindAny:
 		ok = true
 	case t.HasString:
-		ok = kind == kindString
+		ok = kind&kindString != 0
 		if !ok {
 			unexpected = fmt.Sprintf("string %q", t.String)
 		}
 	case t.Ident != "":
-		ok = kind == kindIdent || kind == kindInt
+		ok = kind&(kindIdent|kindInt) != 0
 		if !ok {
 			unexpected = fmt.Sprintf("identifier %v", t.Ident)
 		}
 	default:
-		ok = kind == kindInt
+		ok = kind&kindInt != 0
 		if !ok {
 			unexpected = fmt.Sprintf("int %v", t.Value)
 		}
 	}
 	if !ok {
-		switch kind {
-		case kindString:
-			expect = "string"
-		case kindIdent:
-			expect = "identifier"
-		case kindInt:
-			expect = "int"
+		var expected []string
+		if kind&kindString != 0 {
+			expected = append(expected, "string")
 		}
+		if kind&kindIdent != 0 {
+			expected = append(expected, "identifier")
+		}
+		if kind&kindInt != 0 {
+			expected = append(expected, "int")
+		}
+		expect = strings.Join(expected, " or ")
 	}
 	return
 }

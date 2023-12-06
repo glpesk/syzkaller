@@ -589,8 +589,16 @@ syz_bf_struct3 {
 	f4	int64be:16
 }
 
+syz_bf_struct26 {
+	f0	bytesize[parent, int32]
+	f1	int32:16[bitmask_flags2]
+	f2	int32:8
+	f3	int32:8[0x18]
+}
+
 test$bf0(a0 ptr[in, syz_bf_struct0])
 test$bf1(a0 ptr[in, syz_bf_struct1])
+test$bf2(a0 ptr[in, syz_bf_struct26])
 
 # Checksums
 
@@ -809,6 +817,21 @@ auto_struct0 {
 	f0	len[parent, int32]
 	f1	const[0x43, int32]
 	f2	int32
+}
+
+test$auto1(a const[0x42], b ptr[in, auto_struct1], c len[b], d int32)
+
+auto_struct1 {
+	f0	len[parent, int32]
+	f1	const[0x43, int32]
+	f2	const[0, int32]
+}
+
+test$auto2(a const[0x42], b ptr[in, auto_struct2], c len[b], d int32)
+
+auto_struct2 {
+	f0	len[parent, int32]
+	f1	auto_struct1
 }
 
 # Attributes

@@ -157,14 +157,23 @@ slen1 {
 	f7 len[syscall:b, int32]	### len target b does not exist
 	f8 offsetof[parent, int32]	### offsetof must refer to fields
 	f9 offsetof[slen1, int32]	### offsetof must refer to fields
+	f10 len[f0:syscall:b, int32]	### syscall can't be in the middle of path expressions
+	f11 len[slen3:a, int32]		### len path slen3 does not refer to a struct
 	slen2 ptr[in, array[slen2]]
 	slen21 slen2
+	slen3 slen3
 	slen22 array[slen2]
 }
 
 slen2 {
-	f int32
+	f	int32
+	f1	slen3
 }
+
+slen3 [
+	a int32
+	b int32
+]
 
 # Resource ctor tests.
 
@@ -369,6 +378,7 @@ foo$531(a ptr[in, const[0xffffffffffffffab, int8]])
 foo$532(a ptr[in, const[0x7234567812345678, int64]])
 foo$533(a ptr[in, const[0x12, int8:4]])	### const val 0x12 does not fit into 4 bits
 foo$534(a ptr[in, flags[large_flags, int8]])	### large_flags U16_MAX=0xffff doesn't fit into 8 bits
+foo$535(a int64[no])			### unknown flags no
 
 large_flags = U8_MAX, U16_MAX
 
@@ -381,6 +391,9 @@ equal_flags_call(a flags[equal_flags_0], b flags[equal_flags_1], c flags[non_equ
 type type500 proc[C1, 8, int8]	### values starting from 1 with step 8 overflow base type for 32 procs
 type type501 int8		### unused type type501
 type type502[C] const[C, int8]	### unused type type502
+
+C2 = 0, 1, 2			### const C2 is already a flag
+use_flags(a flags[C2])
 
 s405 {
 	f1	int16:8[-256:0]		### int range [18446744073709551360:0] is too large for base type of size 8
