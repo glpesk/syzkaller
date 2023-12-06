@@ -1005,7 +1005,7 @@ func TestRemindersPriority(t *testing.T) {
 	defer c.Close()
 
 	client := c.makeClient(clientSubsystemRemind, keySubsystemRemind, true)
-	mailingList := c.config().Namespaces["subsystem-reminders"].Reporting[1].Config.(*EmailConfig).Email
+	cc := EmailOptCC([]string{"bugs@syzkaller.com", "default@maintainers.com"})
 	build := testBuild(1)
 	client.UploadBuild(build)
 
@@ -1018,7 +1018,7 @@ func TestRemindersPriority(t *testing.T) {
 	client.ReportCrash(aFirst)
 	sender, firstExtID := client.pollEmailAndExtID()
 	c.incomingEmail(sender, "#syz set prio: low\n",
-		EmailOptFrom("test@requester.com"), EmailOptCC([]string{mailingList}))
+		EmailOptFrom("test@requester.com"), cc)
 	c.advanceTime(time.Hour)
 
 	// WARNING: a second, normal prio
@@ -1036,7 +1036,7 @@ func TestRemindersPriority(t *testing.T) {
 	client.ReportCrash(aThird)
 	sender, thirdExtID := client.pollEmailAndExtID()
 	c.incomingEmail(sender, "#syz set prio: high\n",
-		EmailOptFrom("test@requester.com"), EmailOptCC([]string{mailingList}))
+		EmailOptFrom("test@requester.com"), cc)
 	c.advanceTime(time.Hour)
 
 	// Report bugs once more to pretend they're still valid.
@@ -1056,8 +1056,9 @@ This is a 30-day syzbot report for the subsystemA subsystem.
 All related reports/information can be found at:
 https://testapp.appspot.com/subsystem-reminders/s/subsystemA
 
-During the period, 3 new issues were detected and 0 were fixed.
-In total, 3 issues are still open.
+During the period, 2 new issues were detected and 0 were fixed.
+In total, 2 issues are still open.
+There is also 1 low-priority issue.
 
 Some of the still happening issues:
 
@@ -1066,8 +1067,6 @@ Ref Crashes Repro Title
                   https://testapp.appspot.com/bug?extid=%[1]v
 <2> 2       No    WARNING: a second
                   https://testapp.appspot.com/bug?extid=%[2]v
-<3> 2       Yes   WARNING: a first
-                  https://testapp.appspot.com/bug?extid=%[3]v
 
 The report will be sent to: [subsystemA@list.com subsystemA@person.com].
 

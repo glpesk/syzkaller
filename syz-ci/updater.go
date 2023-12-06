@@ -194,6 +194,10 @@ func (upd *SyzUpdater) UpdateAndRestart() {
 	if err := osutil.CopyFile(latestBin, upd.exe); err != nil {
 		log.Fatal(err)
 	}
+	if *flagExitOnUpgrade {
+		log.Logf(0, "exiting, please restart syz-ci to run the new version")
+		os.Exit(0)
+	}
 	if err := syscall.Exec(upd.exe, os.Args, os.Environ()); err != nil {
 		log.Fatal(err)
 	}
@@ -218,6 +222,7 @@ func (upd *SyzUpdater) pollAndBuild(lastCommit string) string {
 	return commit.Hash
 }
 
+// nolint: goconst // "GOPATH=" looks good here, ignore
 func (upd *SyzUpdater) build(commit *vcs.Commit) error {
 	// syzkaller testing may be slowed down by concurrent kernel builds too much
 	// and cause timeout failures, so we serialize it with other builds:
@@ -308,7 +313,7 @@ func (upd *SyzUpdater) uploadBuildError(commit *vcs.Commit, buildErr error) {
 	title = "syzkaller: " + title
 	for _, mgrcfg := range upd.cfg.Managers {
 		if upd.dashboardAddr == "" || mgrcfg.DashboardClient == "" {
-			log.Logf(0, "not uploading build error fr %v: no dashboard", mgrcfg.Name)
+			log.Logf(0, "not uploading build error for %v: no dashboard", mgrcfg.Name)
 			continue
 		}
 		dash, err := dashapi.New(mgrcfg.DashboardClient, upd.dashboardAddr, mgrcfg.DashboardKey)

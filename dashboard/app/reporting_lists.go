@@ -264,6 +264,11 @@ func querySubsystemReport(c context.Context, subsystem *Subsystem, reporting *Re
 			// Don't take bugs which are too new -- they're still fresh in memory.
 			continue
 		}
+		if bug.prio() == LowPrioBug {
+			// Don't include low priority bugs in reports because the community
+			// actually perceives them as non-actionable.
+			continue
+		}
 		discussions := bug.discussionSummary()
 		if discussions.ExternalMessages > 0 &&
 			discussions.LastMessage.After(timeNow(c).Add(-config.UserReplyFrist)) {
@@ -323,25 +328,28 @@ func querySubsystemReport(c context.Context, subsystem *Subsystem, reporting *Re
 }
 
 func makeSubsystemReportStats(c context.Context, open, fixed []*Bug, days int) SubsystemReportStats {
-	if days > 0 {
-		after := timeNow(c).Add(-time.Hour * 24 * time.Duration(days))
-		ret := SubsystemReportStats{}
-		for _, bug := range open {
-			if bug.FirstTime.After(after) {
-				ret.Reported++
-			}
+	after := timeNow(c).Add(-time.Hour * 24 * time.Duration(days))
+	ret := SubsystemReportStats{}
+	for _, bug := range open {
+		if days > 0 && bug.FirstTime.Before(after) {
+			continue
 		}
-		for _, bug := range fixed {
-			if len(bug.CommitInfo) > 0 && bug.CommitInfo[0].Date.After(after) {
-				ret.Fixed++
-			}
+		if bug.prio() == LowPrioBug {
+			ret.LowPrio++
+		} else {
+			ret.Reported++
 		}
-		return ret
 	}
-	return SubsystemReportStats{
-		Reported: len(open),
-		Fixed:    len(fixed),
+	for _, bug := range fixed {
+		if len(bug.CommitInfo) == 0 {
+			continue
+		}
+		if days > 0 && bug.CommitInfo[0].Date.Before(after) {
+			continue
+		}
+		ret.Fixed++
 	}
+	return ret
 }
 
 func queryMatchingBugs(c context.Context, ns, name string, accessLevel AccessLevel) ([]*Bug, []*Bug, error) {

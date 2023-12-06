@@ -105,7 +105,7 @@ func (comp *compiler) extractConsts() map[string]*ConstInfo {
 func (comp *compiler) extractTypeConsts(infos map[string]*constInfo, n ast.Node) {
 	comp.foreachType(n, func(t *ast.Type, desc *typeDesc, args []*ast.Type, _ prog.IntTypeCommon) {
 		for i, arg := range args {
-			if desc.Args[i].Type.Kind == kindInt {
+			if desc.Args[i].Type.Kind&kindInt != 0 {
 				if arg.Ident != "" {
 					comp.addConst(infos, arg.Pos, arg.Ident)
 				}
@@ -121,6 +121,13 @@ func (comp *compiler) extractTypeConsts(infos map[string]*constInfo, n ast.Node)
 
 func (comp *compiler) addConst(infos map[string]*constInfo, pos ast.Pos, name string) {
 	if _, builtin := comp.builtinConsts[name]; builtin {
+		return
+	}
+	// In case of intN[identA], identA may refer to a constant or to a set of
+	// flags. To avoid marking all flags as constants, we must check here
+	// whether identA refers to a flag. We have a check in the compiler to
+	// ensure an identifier can never refer to both a constant and flags.
+	if _, isFlag := comp.intFlags[name]; isFlag {
 		return
 	}
 	info := getConstInfo(infos, pos)
@@ -228,7 +235,7 @@ func (comp *compiler) patchConsts(consts0 map[string]uint64) {
 			comp.foreachType(decl, func(_ *ast.Type, desc *typeDesc,
 				args []*ast.Type, _ prog.IntTypeCommon) {
 				for i, arg := range args {
-					if desc.Args[i].Type.Kind == kindInt {
+					if desc.Args[i].Type.Kind&kindInt != 0 {
 						comp.patchTypeConst(arg, consts, &missing)
 					}
 				}
@@ -295,6 +302,11 @@ func (comp *compiler) patchConst(val *uint64, id *string, consts map[string]uint
 			*id = ""
 		}
 		*val = v
+		return true
+	}
+	// This check is necessary because in intN[identA], identA may be a
+	// constant or a set of flags.
+	if _, isFlag := comp.intFlags[*id]; isFlag {
 		return true
 	}
 	if missing != nil && *missing == "" {

@@ -246,6 +246,12 @@ func (c *Ctx) setNoObsoletions() {
 	}
 }
 
+func (c *Ctx) updateReporting(ns, name string, f func(Reporting) Reporting) {
+	c.transformContext = func(c context.Context) context.Context {
+		return contextWithConfig(c, replaceReporting(c, ns, name, f))
+	}
+}
+
 func (c *Ctx) decommissionManager(ns, oldManager, newManager string) {
 	c.transformContext = func(c context.Context) context.Context {
 		newConfig := replaceManagerConfig(c, ns, oldManager, func(cfg ConfigManager) ConfigManager {
@@ -310,6 +316,7 @@ func (c *Ctx) httpRequest(method, url, body string, access AccessLevel) (*httpte
 	if err != nil {
 		c.t.Fatal(err)
 	}
+	r.Header.Add("X-Appengine-User-IP", "127.0.0.1")
 	r = registerRequest(r, c)
 	r = r.WithContext(c.transformContext(r.Context()))
 	if access == AccessAdmin || access == AccessUser {
@@ -726,6 +733,21 @@ func replaceManagerConfig(c context.Context, ns, mgr string, f func(ConfigManage
 			newMgrMap[name] = mgrCfg
 		}
 		ret.Managers = newMgrMap
+		return &ret
+	})
+}
+
+func replaceReporting(c context.Context, ns, name string, f func(Reporting) Reporting) *GlobalConfig {
+	return replaceNamespaceConfig(c, ns, func(cfg *Config) *Config {
+		ret := *cfg
+		var newReporting []Reporting
+		for _, cfg := range ret.Reporting {
+			if cfg.Name == name {
+				cfg = f(cfg)
+			}
+			newReporting = append(newReporting, cfg)
+		}
+		ret.Reporting = newReporting
 		return &ret
 	})
 }

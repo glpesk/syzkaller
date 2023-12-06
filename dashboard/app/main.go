@@ -22,6 +22,7 @@ import (
 	"github.com/google/syzkaller/dashboard/dashapi"
 	"github.com/google/syzkaller/pkg/debugtracer"
 	"github.com/google/syzkaller/pkg/email"
+	"github.com/google/syzkaller/pkg/hash"
 	"github.com/google/syzkaller/pkg/html"
 	"github.com/google/syzkaller/pkg/subsystem"
 	"github.com/google/syzkaller/pkg/vcs"
@@ -56,7 +57,7 @@ func initHTTPHandlers() {
 	http.Handle("/x/minfo.txt", handlerWrapper(handleTextX(textMachineInfo)))
 	for ns := range getConfig(context.Background()).Namespaces {
 		http.Handle("/"+ns, handlerWrapper(handleMain))
-		http.Handle("/"+ns+"/fixed", handlerWrapper(handleFixed))
+		http.Handle("/"+ns+"/fixed", handlerWrapper(handleFixed)) // nolint: goconst // remove it with goconst 1.7.0+
 		http.Handle("/"+ns+"/invalid", handlerWrapper(handleInvalid))
 		http.Handle("/"+ns+"/graph/bugs", handlerWrapper(handleKernelHealthGraph))
 		http.Handle("/"+ns+"/graph/lifetimes", handlerWrapper(handleGraphLifetimes))
@@ -469,6 +470,10 @@ func (filter *userBugFilter) MatchBug(bug *Bug) bool {
 	return true
 }
 
+func (filter *userBugFilter) Hash() string {
+	return hash.String([]byte(fmt.Sprintf("%#v", filter)))
+}
+
 func splitLabel(rawLabel string) (BugLabelType, string) {
 	label, value, _ := strings.Cut(rawLabel, ":")
 	return BugLabelType(label), value
@@ -492,7 +497,7 @@ func handleMain(c context.Context, w http.ResponseWriter, r *http.Request) error
 	if err != nil {
 		return fmt.Errorf("%w: failed to parse URL parameters", ErrClientBadRequest)
 	}
-	managers, err := loadManagers(c, accessLevel, hdr.Namespace, filter)
+	managers, err := CachedUIManagers(c, accessLevel, hdr.Namespace, filter)
 	if err != nil {
 		return err
 	}
@@ -527,7 +532,7 @@ func handleMain(c context.Context, w http.ResponseWriter, r *http.Request) error
 func handleFixed(c context.Context, w http.ResponseWriter, r *http.Request) error {
 	return handleTerminalBugList(c, w, r, &TerminalBug{
 		Status:      BugStatusFixed,
-		Subpage:     "/fixed",
+		Subpage:     "/fixed", // nolint: goconst // TODO: remove it once goconst 1.7.0+ landed
 		ShowPatch:   true,
 		ShowPatched: true,
 	})
@@ -780,7 +785,7 @@ func handleRepos(c context.Context, w http.ResponseWriter, r *http.Request) erro
 	if err != nil {
 		return err
 	}
-	repos, err := loadRepos(c, accessLevel(c, r), hdr.Namespace)
+	repos, err := loadRepos(c, hdr.Namespace)
 	if err != nil {
 		return err
 	}
@@ -958,7 +963,7 @@ func handleBug(c context.Context, w http.ResponseWriter, r *http.Request) error 
 	if err != nil {
 		return err
 	}
-	managers, err := managerList(c, bug.Namespace)
+	managers, err := CachedManagerList(c, bug.Namespace)
 	if err != nil {
 		return err
 	}
@@ -1355,7 +1360,7 @@ func handleSubsystemsList(c context.Context, w http.ResponseWriter, r *http.Requ
 		},
 		Fixed: uiSubsystemStats{
 			Count: cached.NoSubsystem.Fixed,
-			Link:  html.AmendURL("/"+hdr.Namespace+"/fixed", "no_subsystem", "true"),
+			Link:  html.AmendURL("/"+hdr.Namespace+"/fixed", "no_subsystem", "true"), // nolint: goconst
 		},
 	}
 	sort.Slice(list, func(i, j int) bool { return list[i].Name < list[j].Name })
@@ -1380,7 +1385,7 @@ func createUISubsystem(ns string, item *subsystem.Subsystem, cached *Cached) *ui
 		},
 		Fixed: uiSubsystemStats{
 			Count: stats.Fixed,
-			Link: html.AmendURL("/"+ns+"/fixed", "label", BugLabel{
+			Link: html.AmendURL("/"+ns+"/fixed", "label", BugLabel{ // nolint: goconst
 				Label: SubsystemLabel,
 				Value: item.Name,
 			}.String()),
@@ -1517,7 +1522,7 @@ func fetchNamespaceBugs(c context.Context, accessLevel AccessLevel, ns string,
 	if err != nil {
 		return nil, err
 	}
-	managers, err := managerList(c, ns)
+	managers, err := CachedManagerList(c, ns)
 	if err != nil {
 		return nil, err
 	}
@@ -1652,7 +1657,7 @@ func fetchTerminalBugs(c context.Context, accessLevel AccessLevel,
 	if err != nil {
 		return nil, nil, err
 	}
-	managers, err := managerList(c, ns)
+	managers, err := CachedManagerList(c, ns)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -1744,7 +1749,7 @@ func loadSimilarBugsUI(c context.Context, r *http.Request, bug *Bug, state *Repo
 			continue
 		}
 		if managers[similar.Namespace] == nil {
-			mgrs, err := managerList(c, similar.Namespace)
+			mgrs, err := CachedManagerList(c, similar.Namespace)
 			if err != nil {
 				return nil, err
 			}
@@ -1995,8 +2000,8 @@ func makeUIBuild(c context.Context, build *Build) *uiBuild {
 	}
 }
 
-func loadRepos(c context.Context, accessLevel AccessLevel, ns string) ([]*uiRepo, error) {
-	managers, _, err := loadManagerList(c, accessLevel, ns, nil)
+func loadRepos(c context.Context, ns string) ([]*uiRepo, error) {
+	managers, _, err := loadNsManagerList(c, ns, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -2040,7 +2045,7 @@ func loadRepos(c context.Context, accessLevel AccessLevel, ns string) ([]*uiRepo
 func loadManagers(c context.Context, accessLevel AccessLevel, ns string, filter *userBugFilter) ([]*uiManager, error) {
 	now := timeNow(c)
 	date := timeDate(now)
-	managers, managerKeys, err := loadManagerList(c, accessLevel, ns, filter)
+	managers, managerKeys, err := loadNsManagerList(c, ns, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -2137,8 +2142,7 @@ func loadManagers(c context.Context, accessLevel AccessLevel, ns string, filter 
 	return results, nil
 }
 
-func loadManagerList(c context.Context, accessLevel AccessLevel, ns string,
-	filter *userBugFilter) ([]*Manager, []*db.Key, error) {
+func loadNsManagerList(c context.Context, ns string, filter *userBugFilter) ([]*Manager, []*db.Key, error) {
 	managers, keys, err := loadAllManagers(c, ns)
 	if err != nil {
 		return nil, nil, err
@@ -2147,9 +2151,6 @@ func loadManagerList(c context.Context, accessLevel AccessLevel, ns string,
 	var filteredKeys []*db.Key
 	for i, mgr := range managers {
 		cfg := getNsConfig(c, mgr.Namespace)
-		if accessLevel < cfg.AccessLevel {
-			continue
-		}
 		if ns == "" && cfg.Decommissioned {
 			continue
 		}
