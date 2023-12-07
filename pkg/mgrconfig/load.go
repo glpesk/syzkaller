@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"runtime"
 	"strings"
+	"time"
 
 	"github.com/google/syzkaller/pkg/config"
 	"github.com/google/syzkaller/pkg/osutil"
@@ -209,6 +210,12 @@ func (cfg *Config) initTimeouts() {
 	}
 	// Note: we could also consider heavy debug tools (KASAN/KMSAN/KCSAN/KMEMLEAK) if necessary.
 	cfg.Timeouts = cfg.SysTarget.Timeouts(slowdown)
+	// A hack to extend (3x) the syscall- and program-level timeouts for starnix, without multiplying the
+	// VM timeouts by a slowdown factor.
+	if cfg.Type == "starnix" {
+		cfg.Timeouts.Syscall = 150 * time.Millisecond
+		cfg.Timeouts.Program = 15 * time.Second
+	}
 }
 
 func checkNonEmpty(fields ...string) error {
