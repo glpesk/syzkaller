@@ -418,6 +418,18 @@ static void setup_features(char** enable, int n);
 static uint64 sandbox_arg = 0;
 #endif
 
+#if GOOS_linux
+#include <sys/utsname.h>
+static bool is_starnix() {
+  struct utsname buf;
+  return uname(&buf) == 0 && strstr(buf.release, "starnix") != nullptr;
+}
+#else
+constexpr bool is_starnix() {
+  return false
+}
+#endif
+
 int main(int argc, char** argv)
 {
 	if (argc == 2 && strcmp(argv[1], "version") == 0) {
@@ -630,6 +642,20 @@ void parse_env_flags(uint64 flags)
 	flag_nic_vf = flags & (1 << 15);
 }
 
+void unset_feature_flags() {
+        flag_extra_coverage = false;
+        flag_net_injection = false;
+        flag_net_devices = false;
+        flag_net_reset = false;
+        flag_cgroups = false;
+        flag_close_fds = false;
+        flag_devlink_pci = false;
+        flag_vhci_injection = false;
+        flag_wifi = false;
+        flag_delay_kcov_mmap = false;
+        flag_nic_vf =false;
+}
+
 #if SYZ_EXECUTOR_USES_FORK_SERVER
 void receive_handshake()
 {
@@ -643,6 +669,11 @@ void receive_handshake()
 	sandbox_arg = req.sandbox_arg;
 #endif
 	parse_env_flags(req.flags);
+#if GOOS_linux
+        if (is_starnix()) {
+                unset_feature_flags();
+        }
+#endif
 	procid = req.pid;
 }
 
@@ -667,6 +698,11 @@ void receive_execute()
 	if (req.prog_size > kMaxInput)
 		failmsg("bad execute prog size", "size=0x%llx", req.prog_size);
 	parse_env_flags(req.env_flags);
+#if GOOS_linux
+        if (is_starnix()) {
+                unset_feature_flags();
+        }
+#endif
 	procid = req.pid;
 	syscall_timeout_ms = req.syscall_timeout_ms;
 	program_timeout_ms = req.program_timeout_ms;
@@ -1667,6 +1703,10 @@ void setup_features(char** enable, int n)
 	// This does any one-time setup for the requested features on the machine.
 	// Note: this can be called multiple times and must be idempotent.
 	flag_debug = true;
+        // For now, if we're fuzzing starnix, don't set up any features.
+        if (is_starnix()) {
+                fail("setup: feature unsupported");
+        }
 	if (n != 1)
 		fail("setup: more than one feature");
 	char* endptr = nullptr;
