@@ -607,7 +607,10 @@ void setup_control_pipes()
 void parse_env_flags(uint64 flags)
 {
 	// Note: Values correspond to ordering in pkg/ipc/ipc.go, e.g. FlagSandboxNamespace
-	flag_debug = flags & (1 << 0);
+        //
+        // TODO: understand why `flag_debug` isn't set when `-debug=true` is passed to syz-fuzzer.
+        //	flag_debug = flags & (1 << 0);
+        flag_debug = true;
 	flag_coverage = flags & (1 << 1);
 	if (flags & (1 << 2))
 		flag_sandbox_setuid = true;
