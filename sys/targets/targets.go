@@ -498,7 +498,7 @@ var oses = map[string]osCommon{
 	Linux: {
 		SyscallNumbers:         true,
 		SyscallPrefix:          "__NR_",
-		ExecutorUsesShmem:      true,
+		ExecutorUsesShmem:      false,
 		ExecutorUsesForkServer: true,
 		KernelObject:           "vmlinux",
 		PseudoSyscallDeps: map[string][]string{
