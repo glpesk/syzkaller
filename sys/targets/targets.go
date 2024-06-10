@@ -590,7 +590,7 @@ var oses = map[string]osCommon{
 
 var (
 	commonCFlags = []string{
-		"-O2",
+		"-ggdb",
 		"-pthread",
 		"-Wall",
 		"-Werror",
@@ -607,7 +607,6 @@ var (
 		"-static":                           true, // some distributions don't have static libraries
 		"-static-pie":                       true, // this flag is also not supported everywhere
 		"-Wunused-const-variable":           true, // gcc 5 does not support this flag
-		"-fsanitize=address":                true, // some OSes don't have ASAN
 		"-Wno-stringop-overflow":            true,
 		"-Wno-array-bounds":                 true,
 		"-Wno-format-overflow":              true,
