@@ -575,14 +575,15 @@ func (ctx *context) testWithInstance(callback func(execInterface) (rep *instance
 	var result *instance.RunResult
 	var err error
 
-	const attempts = 3
+	const attempts = 5
 	for i := 0; i < attempts; i++ {
+		ctx.reproLogf(0, "testWithInstance: attempt %d", i)
 		// It's hard to classify all kinds of errors into the one worth repeating
 		// and not. So let's just retry runs for all errors.
 		// If the problem is transient, it will likely go away.
 		// If the problem is permanent, it will just be the same.
 		result, err = ctx.runOnInstance(callback)
-		if err == nil {
+		if err == nil && result != nil && result.Report != nil && result.Report.Title == ctx.crashTitle {
 			break
 		}
 	}
@@ -599,6 +600,10 @@ func (ctx *context) testWithInstance(callback func(execInterface) (rep *instance
 	}
 	if ctx.crashType == crash.MemoryLeak && rep.Type != crash.MemoryLeak {
 		ctx.reproLogf(2, "not a leak crash: %v", rep.Title)
+		return false, nil
+	}
+	if ctx.crashTitle != rep.Title {
+		ctx.reproLogf(2, "crashed but title did not match: %v", rep.Title)
 		return false, nil
 	}
 	ctx.report = rep
