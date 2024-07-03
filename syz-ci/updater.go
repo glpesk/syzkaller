@@ -66,7 +66,7 @@ func NewSyzUpdater(cfg *Config) *SyzUpdater {
 	}
 
 	gopath := filepath.Join(wd, "gopath")
-	syzkallerDir := filepath.Join(gopath, "src", "github.com", "google", "syzkaller")
+	syzkallerDir := filepath.Join(gopath, "src", "github.com", "glpesk", "syzkaller")
 	osutil.MkdirAll(syzkallerDir)
 
 	// List of required files in syzkaller build (contents of latest/current dirs).

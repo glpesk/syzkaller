@@ -189,6 +189,9 @@ const (
 func NewRepo(os, vmType, dir string, opts ...RepoOpt) (Repo, error) {
 	switch os {
 	case targets.Linux:
+		if vmType == "starnix" {
+			return newFuchsia(dir, opts), nil
+		}
 		return newLinux(dir, opts, vmType), nil
 	case targets.Fuchsia:
 		return newFuchsia(dir, opts), nil
