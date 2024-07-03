@@ -139,6 +139,8 @@ func getBuilder(targetOS, targetArch, vmType string) (builder, error) {
 			return cuttlefish{}, nil
 		} else if vmType == "proxyapp:android" {
 			return android{}, nil
+		} else if vmType == "starnix" {
+			return starnix{}, nil
 		}
 	}
 	builders := map[string]builder{
