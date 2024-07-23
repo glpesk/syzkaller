@@ -169,7 +169,9 @@ func (env *env) BuildKernel(buildCfg *BuildKernelConfig) (
 }
 
 func SetConfigImage(cfg *mgrconfig.Config, imageDir string, reliable bool) error {
-	cfg.KernelObj = filepath.Join(imageDir, "obj")
+	if cfg.Type != "starnix" {
+		cfg.KernelObj = filepath.Join(imageDir, "obj")
+	}
 	cfg.Image = filepath.Join(imageDir, "image")
 	if keyFile := filepath.Join(imageDir, "key"); osutil.IsExist(keyFile) {
 		cfg.SSHKey = keyFile
@@ -199,6 +201,9 @@ func SetConfigImage(cfg *mgrconfig.Config, imageDir string, reliable bool) error
 }
 
 func OverrideVMCount(cfg *mgrconfig.Config, n int) error {
+	if cfg.Type == "starnix" {
+		return nil
+	}
 	vmConfig := make(map[string]interface{})
 	if err := json.Unmarshal(cfg.VM, &vmConfig); err != nil {
 		return fmt.Errorf("failed to parse VM config: %w", err)
