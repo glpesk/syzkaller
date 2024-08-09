@@ -237,6 +237,12 @@ func (m *ManagerJobs) Filter(filter *ManagerJobs) *ManagerJobs {
 }
 
 func main() {
+	testDir, err := os.MkdirTemp("", "test-dir")
+	if err != nil {
+		log.Logf(0, "failed to make test tmpdir: %v", err)
+	}
+	log.Logf(0, "test tmpdir path: %v", testDir)
+
 	flag.Parse()
 	log.EnableLogCaching(1000, 1<<20)
 	cfg, err := loadConfig(*flagConfig)
