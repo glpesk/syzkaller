@@ -17,6 +17,7 @@ type fuchsia struct {
 }
 
 func newFuchsia(dir string, opts []RepoOpt) *fuchsia {
+	opts = append(opts, OptPrecious)
 	return &fuchsia{
 		dir:  dir,
 		repo: newGit(dir, nil, opts),

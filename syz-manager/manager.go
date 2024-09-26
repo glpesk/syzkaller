@@ -371,6 +371,7 @@ func (mgr *Manager) processFuzzingResults(ctx context.Context) {
 				mgr.reproLoop.Enqueue(crash)
 			}
 		case err := <-mgr.pool.BootErrors:
+			log.Logf(0, "boot error: %v", err)
 			crash := mgr.convertBootError(err)
 			if crash != nil {
 				mgr.saveCrash(crash)
