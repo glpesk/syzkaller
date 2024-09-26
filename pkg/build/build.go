@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/google/syzkaller/pkg/debugtracer"
+	"github.com/google/syzkaller/pkg/log"
 	"github.com/google/syzkaller/pkg/osutil"
 	"github.com/google/syzkaller/pkg/report"
 	"github.com/google/syzkaller/pkg/vcs"
@@ -92,6 +93,7 @@ func Image(params Params) (details ImageDetails, err error) {
 		}
 	}
 	details, err = builder.build(params)
+	log.Logf(0, "build result: %+v %v", details, err)
 	if details.CompilerID == "" {
 		// Fill in the compiler info even if the build failed.
 		var idErr error

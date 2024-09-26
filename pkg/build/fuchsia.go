@@ -51,7 +51,7 @@ func (fu fuchsia) build(params Params) (ImageDetails, error) {
 	); err != nil {
 		return ImageDetails{}, err
 	}
-	if _, err := runSandboxed(time.Hour*2, params.KernelDir, "scripts/fx", "clean-build"); err != nil {
+	if _, err := runSandboxed(time.Hour*2, params.KernelDir, "scripts/fx", "build"); err != nil {
 		return ImageDetails{}, err
 	}
 
@@ -103,6 +103,7 @@ func (fu fuchsia) clean(kernelDir, targetArch string) error {
 func runSandboxed(timeout time.Duration, dir, command string, arg ...string) ([]byte, error) {
 	cmd := osutil.Command(command, arg...)
 	cmd.Dir = dir
+	cmd.Env = append(cmd.Environ(), "FUCHSIA_ANALYTICS_DISABLED=1")
 	if err := osutil.Sandbox(cmd, true, false); err != nil {
 		return nil, err
 	}

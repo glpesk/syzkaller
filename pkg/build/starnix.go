@@ -75,28 +75,31 @@ func (st starnix) build(params Params) (ImageDetails, error) {
 		30*time.Second,
 		params.KernelDir,
 		ffxBinary,
+		"-c", "log.enabled=false,ffx.analytics.disabled=true,daemon.autostart=false",
 		"config", "get", "product.path",
 	)
 	if err != nil {
-		return ImageDetails{}, nil
+		return ImageDetails{}, err
 	}
-	productBundlePath := strings.Trim(string(productBundlePathRaw), "\"")
-	fxfsPath, err := runSandboxed(
+	productBundlePath := strings.Trim(string(productBundlePathRaw), "\"\n")
+	fxfsPathRaw, err := runSandboxed(
 		30*time.Second,
 		params.KernelDir,
 		ffxBinary,
+		"-c", "log.enabled=false,ffx.analytics.disabled=true,daemon.autostart=false",
 		"product", "get-image-path", productBundlePath,
 		"--slot", "a",
 		"--image-type", "fxfs",
 	)
 	if err != nil {
-		return ImageDetails{}, nil
+		return ImageDetails{}, err
 	}
+	fxfsPath := strings.Trim(string(fxfsPathRaw), "\"\n")
 	if err := osutil.CopyFile(string(fxfsPath), filepath.Join(params.OutputDir, "image")); err != nil {
 		return ImageDetails{}, err
 	}
 	kernelObjPath := filepath.Join(params.KernelDir, "out", arch, "exe.unstripped", "starnix_kernel")
-	if err := osutil.CopyFile(kernelObjPath, filepath.Join(params.OutputDir, "obj")); err != nil {
+	if err := osutil.CopyFile(kernelObjPath, filepath.Join(params.OutputDir, "obj", "vmlinux")); err != nil {
 		return ImageDetails{}, err
 	}
 	return ImageDetails{}, nil
