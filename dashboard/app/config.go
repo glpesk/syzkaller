@@ -449,6 +449,9 @@ func validateGlobalConfig() {
 }
 
 func getNsConfig(c context.Context, ns string) *Config {
+	fmt.Println("bug.Namespace ns: ", ns)
+	fmt.Println("config.Namespace key length: ", len(getConfig(c).Namespaces))
+	fmt.Println("config.Namespace keys: ", getConfig(c).Namespaces)
 	return getConfig(c).Namespaces[ns]
 }
 
