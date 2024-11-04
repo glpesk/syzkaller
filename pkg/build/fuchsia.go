@@ -102,7 +102,7 @@ func (fu fuchsia) clean(params Params) error {
 
 func runSandboxed(timeout time.Duration, dir, command string, arg ...string) ([]byte, error) {
 	cmd := osutil.Command(command, arg...)
-	fmt.Printf("cmd: %v\n", cmd)
+	fmt.Println("cmd:", cmd)
 	cmd.Dir = dir
 	if err := osutil.Sandbox(cmd, true, false); err != nil {
 		return nil, err
