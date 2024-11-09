@@ -72,6 +72,18 @@ func (st starnix) build(params Params) (ImageDetails, error) {
 		return ImageDetails{}, err
 	}
 
+	disable_ffx_analytics, err := runSandboxed(
+		30*time.Second,
+		params.KernelDir,
+		ffxBinary,
+		"-c", "log.enabled=false,ffx.analytics.disabled=true,daemon.autostart=false",
+		"config", "analytics", "disable",
+	)
+	fmt.Println("disable_ffx_analytics:", disable_ffx_analytics)
+	if err != nil {
+		return ImageDetails{}, err
+	}
+
 	fmt.Println("params.KernelDir:", params.KernelDir)
 	fmt.Println("ffxBinary:", ffxBinary)
 	productBundlePathRaw, err := runSandboxed(
