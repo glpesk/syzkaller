@@ -72,6 +72,30 @@ func (st starnix) build(params Params) (ImageDetails, error) {
 		return ImageDetails{}, err
 	}
 
+	show_ffx_analytics, err := runSandboxed(
+		30*time.Second,
+		params.KernelDir,
+		ffxBinary,
+		"config", "analytics", "show",
+	)
+	fmt.Println("show_ffx_analytics:", show_ffx_analytics)
+	if err != nil {
+		fmt.Println("ERROR:", err)
+		// return ImageDetails{}, err
+	}
+
+	get_config, err := runSandboxed(
+		30*time.Second,
+		params.KernelDir,
+		ffxBinary,
+		"config", "get",
+	)
+	fmt.Println("get_config:", get_config)
+	if err != nil {
+		fmt.Println("ERROR:", err)
+		// return ImageDetails{}, err
+	}
+
 	disable_ffx_analytics, err := runSandboxed(
 		30*time.Second,
 		params.KernelDir,
@@ -81,7 +105,8 @@ func (st starnix) build(params Params) (ImageDetails, error) {
 	)
 	fmt.Println("disable_ffx_analytics:", disable_ffx_analytics)
 	if err != nil {
-		return ImageDetails{}, err
+		fmt.Println("ERROR:", err)
+		// return ImageDetails{}, err
 	}
 
 	fmt.Println("params.KernelDir:", params.KernelDir)
@@ -96,7 +121,8 @@ func (st starnix) build(params Params) (ImageDetails, error) {
 	fmt.Println("productBundlePathRaw:", productBundlePathRaw)
 
 	if err != nil {
-		return ImageDetails{}, err
+		fmt.Println("ERROR:", err)
+		// return ImageDetails{}, err
 	}
 	productBundlePath := strings.Trim(string(productBundlePathRaw), "\"\n")
 	fmt.Println("productBundlePath:", productBundlePath)
@@ -111,17 +137,20 @@ func (st starnix) build(params Params) (ImageDetails, error) {
 	)
 	fmt.Println("fxfsPathRaw:", fxfsPathRaw)
 	if err != nil {
-		return ImageDetails{}, err
+		fmt.Println("ERROR:", err)
+		// return ImageDetails{}, err
 	}
 	fxfsPath := strings.Trim(string(fxfsPathRaw), "\"\n")
 	fmt.Println("fxfsPath:", fxfsPath)
 	if err := osutil.CopyFile(fxfsPath, filepath.Join(params.OutputDir, "image")); err != nil {
-		return ImageDetails{}, err
+		fmt.Println("ERROR:", err)
+		// return ImageDetails{}, err
 	}
 	kernelObjPath := filepath.Join(params.KernelDir, "out", arch, "exe.unstripped", "starnix_kernel")
 	fmt.Println("kernelObjPath:", kernelObjPath)
 	if err := osutil.CopyFile(kernelObjPath, filepath.Join(params.OutputDir, "obj", "vmlinux")); err != nil {
-		return ImageDetails{}, err
+		// return ImageDetails{}, err
+		fmt.Println("ERROR:", err)
 	}
 	return ImageDetails{}, nil
 }
