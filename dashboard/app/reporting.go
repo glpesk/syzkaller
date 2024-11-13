@@ -166,6 +166,9 @@ func reportingPollNotifications(c context.Context, typ string) []*dashapi.BugNot
 	log.Infof(c, "fetched %v bugs", len(bugs))
 	var notifs []*dashapi.BugNotification
 	for _, bug := range bugs {
+		log.Errorf(c, "bug: %v", bug)
+		log.Errorf(c, "bug's namespaces: %v", bug.Namespace)
+		log.Errorf(c, "c: %v", c)
 		if getNsConfig(c, bug.Namespace).Decommissioned {
 			continue
 		}
