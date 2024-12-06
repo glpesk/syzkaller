@@ -70,7 +70,7 @@ func (st starnix) build(params Params) (ImageDetails, error) {
 		return ImageDetails{}, err
 	}
 
-	if _, err := runSandboxed(time.Hour*2, params.KernelDir, "scripts/fx", "build"); err != nil {
+	if _, err := runSandboxed(time.Hour*2, params.KernelDir, "scripts/fx", "--dir", buildDir, "build"); err != nil {
 		return ImageDetails{}, err
 	}
 	ffxBinary, err := starnixVM.GetToolPath(params.KernelDir, "ffx")
