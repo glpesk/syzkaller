@@ -265,9 +265,6 @@ func (git *git) Commit(com string) (*Commit, error) {
 
 func gitParseCommit(output, user, domain []byte, ignoreCC map[string]bool) (*Commit, error) {
 	lines := bytes.Split(output, []byte{'\n'})
-	for len(lines) > 0 && strings.HasPrefix(string(lines[0]), "warning:") {
-		lines = lines[1:]
-	}
 	if len(lines) < 8 || len(lines[0]) != 40 {
 		return nil, fmt.Errorf("unexpected git log output: %q", output)
 	}
