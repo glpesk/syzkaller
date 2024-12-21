@@ -7,12 +7,11 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
-	"time"
 
 	"golang.org/x/sys/unix"
 )
@@ -51,7 +50,7 @@ func removeImmutable(fname string) error {
 }
 
 func Sandbox(cmd *exec.Cmd, user, net bool) error {
-	enabled, uid, gid, err := initSandbox()
+	enabled, uid, gid, homeDir, err := initSandbox()
 	if err != nil || !enabled {
 		return err
 	}
@@ -67,12 +66,15 @@ func Sandbox(cmd *exec.Cmd, user, net bool) error {
 			Uid: uid,
 			Gid: gid,
 		}
+		if homeDir != "" {
+			cmd.Env = append(os.Environ(), fmt.Sprintf("HOME=%s", homeDir))
+		}
 	}
 	return nil
 }
 
 func SandboxChown(file string) error {
-	enabled, uid, gid, err := initSandbox()
+	enabled, uid, gid, _, err := initSandbox()
 	if err != nil || !enabled {
 		return err
 	}
@@ -85,42 +87,35 @@ var (
 	sandboxUsername = "syzkaller"
 	sandboxUID      = ^uint32(0)
 	sandboxGID      = ^uint32(0)
+	sandboxHomeDir  = ""
 )
 
-func initSandbox() (bool, uint32, uint32, error) {
+func initSandbox() (bool, uint32, uint32, string, error) {
 	sandboxOnce.Do(func() {
 		if syscall.Getuid() != 0 || os.Getenv("CI") != "" || os.Getenv("SYZ_DISABLE_SANDBOXING") == "yes" {
 			sandboxEnabled = false
 			return
 		}
-		uid, err := usernameToID("-u")
+		sandboxUser, err := user.Lookup(sandboxUsername)
 		if err != nil {
 			return
 		}
-		gid, err := usernameToID("-g")
+		uid, err := strconv.Atoi(sandboxUser.Uid)
 		if err != nil {
 			return
 		}
-		sandboxUID = uid
-		sandboxGID = gid
+		gid, err := strconv.Atoi(sandboxUser.Gid)
+		if err != nil {
+			return
+		}
+		sandboxUID = uint32(uid)
+		sandboxGID = uint32(gid)
+		sandboxHomeDir = sandboxUser.HomeDir
 	})
 	if sandboxEnabled && sandboxUID == ^uint32(0) {
-		return false, 0, 0, fmt.Errorf("user %q is not found, can't sandbox command", sandboxUsername)
+		return false, 0, 0, "", fmt.Errorf("user %q is not found, can't sandbox command", sandboxUsername)
 	}
-	return sandboxEnabled, sandboxUID, sandboxGID, nil
-}
-
-func usernameToID(what string) (uint32, error) {
-	out, err := RunCmd(time.Minute, "", "id", what, sandboxUsername)
-	if err != nil {
-		return 0, err
-	}
-	str := strings.Trim(string(out), " \t\n")
-	id, err := strconv.ParseUint(str, 10, 32)
-	if err != nil {
-		return 0, err
-	}
-	return uint32(id), nil
+	return sandboxEnabled, sandboxUID, sandboxGID, sandboxHomeDir, nil
 }
 
 func setPdeathsig(cmd *exec.Cmd, hardKill bool) {
