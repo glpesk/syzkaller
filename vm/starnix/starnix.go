@@ -159,8 +159,12 @@ func (pool *Pool) Create(workdir string, index int) (vmimpl.Instance, error) {
 	// Copy auto-detected paths from in-tree ffx to isolated ffx.
 	err = inst.copyFfxConfigValuesToIsolate(
 		"product.path",
+		// For TARGETARCH=amd64
 		"sdk.overrides.aemu_internal",
-		"sdk.overrides.uefi_internal_x64")
+		"sdk.overrides.uefi_internal_x64",
+		// For TARGETARCH=arm64
+		"sdk.overrides.qemu_internal",
+		"sdk.overrides.uefi_internal_arm64")
 	if err != nil {
 		return nil, err
 	}
