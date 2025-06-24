@@ -39,10 +39,12 @@ assembly_developer_overrides("%s") {
 func (st starnix) build(params Params) (ImageDetails, error) {
 	sysTarget := targets.Get(targets.Linux, params.TargetArch)
 	arch := sysTarget.KernelArch
-	if arch != "x86_64" {
+	if arch != "x86_64" && arch != "arm64" {
 		return ImageDetails{}, fmt.Errorf("unsupported starnix arch %v", arch)
 	}
-	arch = "x64"
+	if arch == "x86_64" {
+		arch = "x64"
+	}
 	product := fmt.Sprintf("%s.%s", "workbench_eng", arch)
 
 	localDir := filepath.Join(params.KernelDir, "local")
